@@ -1,0 +1,59 @@
+name: 🚀 poetryofthemachine.com
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - code/static-site/**
+
+jobs:
+  build:
+    name: 🛠 build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+
+      - uses: actions/cache@v2
+        id: npm-cache
+        with:
+          path: |
+            ~/.npm
+            code/static-site/public
+            code/static-site/.cache
+            code/static-site/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Generate static-site
+        run: |
+          cd code/static-site
+          npm install
+          npm run build
+
+      - name: Archive static-site
+        uses: actions/upload-artifact@master
+        with:
+          name: public
+          path: code/static-site/public
+
+  deploy:
+    name: 🎈 release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Download static-site
+        uses: actions/download-artifact@master
+        with:
+          name: public
+          path: code/static-site/public
+
+      - name: Deploy
+        run: |
+          cp data/config/production/firebase/* code/static-site/
+          cd code/static-site
+          npm install -g firebase-tools
+          firebase --token $FIREBASE_TOKEN --project ${PROJECT_ID} deploy
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          PROJECT_ID: poetry-of-the-machines
